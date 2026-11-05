@@ -1,0 +1,63 @@
+'use client';
+
+import { useState } from 'react';
+
+interface Row {
+  order_item_id: number; order_id: number; customer: string; product: string; attendee: string | null;
+  attendee_for?: string | null;
+  session: string | null; quantity: number; price: number; status: string; ticket: string | null;
+}
+
+export default function BookingsClient({ initial }: { initial: Row[] }) {
+  const [rows, setRows] = useState(initial);
+  const [busy, setBusy] = useState(false);
+
+  async function setStatus(id: number, status: string) {
+    setBusy(true);
+    await fetch('/api/admin/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_item_id: id, status }),
+    });
+    setRows((rs) => rs.map((r) => (r.order_item_id === id ? { ...r, status } : r)));
+    setBusy(false);
+  }
+
+  return (
+    <div className="mt-6 space-y-3">
+      {rows.map((b) => (
+        <div key={b.order_item_id} className="card flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-stone-800">
+                {b.product} × {b.quantity}
+                {b.ticket && <span className="ml-2 font-mono text-xs text-brand-700">🎟 {b.ticket}</span>}
+              </p>
+              {b.attendee_for === 'others' && (
+                <span className="rounded-full bg-ochre-100 border border-ochre-300 px-2 py-0.5 text-[10px] font-semibold text-ochre-900">
+                  Guest / Group
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-stone-500">
+              Order #{b.order_id} · {b.customer}{b.attendee ? ` (attendee: ${b.attendee})` : ''}
+              {b.session ? ` · 📅 ${b.session}` : ''} · ₱{b.price.toFixed(2)}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`badge ${b.status === 'cancelled' || b.status === 'no_show' ? 'bg-red-100 text-red-700' : b.status === 'attended' ? 'bg-charcoal-900 text-ochre-300' : 'bg-stone-100 text-stone-600'} capitalize`}>
+              {b.status.replace(/_/g, ' ')}
+            </span>
+            {b.status !== 'cancelled' && b.status !== 'attended' && (
+              <>
+                <button className="btn-outline px-3 py-1 text-xs" disabled={busy} onClick={() => setStatus(b.order_item_id, 'cancelled')}>Cancel</button>
+                <button className="btn-outline px-3 py-1 text-xs" disabled={busy} onClick={() => setStatus(b.order_item_id, 'no_show')}>No-show</button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+      {rows.length === 0 && <p className="text-sm text-stone-500">No bookings yet.</p>}
+    </div>
+  );
+}
